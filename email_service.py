@@ -1,5 +1,6 @@
 import json
 import uuid
+import random
 from flask import Flask, jsonify
 
 app = Flask(__name__)
@@ -17,37 +18,37 @@ def hello_world():
 def receive_emails():
     print("test")
     #ensure format is correct? & then create ran
-    return jsonify({'email_id': uuid.uuid4()})
+    return jsonify({'email_id': random.randint(1, 1000)})
 
-@app.route('/mailbox/email<email_id:int>', methods=['GET'])
+@app.route('/mailbox/email/<int:email_id>', methods=['GET'])
 def get_email():
     return "hi"
 
-@app.route('/mailbox/email/<email_id:int>/folder', methods=['GET'])
+@app.route('/mailbox/email/<int:email_id>/folder', methods=['GET'])
 def get_folder():
     return "yo"
 
-@app.route('/mailbox/email/<email_id:int>/labels', methods=['GET'])
+@app.route('/mailbox/email/<int:email_id>/labels', methods=['GET'])
 def get_labels():
     return "hehe"
 
-@app.route('/mailbox/folder/<folder:str>', methods=['GET'])
+@app.route('/mailbox/folder/<string:folder>', methods=['GET'])
 def emails_in_folder():
     return "heahkl"
 
-@app.route('/mailbox/labels/<label:str>', methods=['GET'])
+@app.route('/mailbox/labels/<string:label>', methods=['GET'])
 def emails_with_label():
     return "kleraho"
 
-@app.route('/mailbox/email/<email_id:int>/folder/<folder:str>', methods=['POST'])
+@app.route('/mailbox/email/<int:email_id>/folder/<string:folder>', methods=['POST'])
 def move_email():
     return "gkdsl"
 
-@app.route('/mailbox/email/<email_id:int>/label/<label:str>', methods=['PUT'])
+@app.route('/mailbox/email/<int:email_id>/label/<string:label>', methods=['PUT'])
 def mark_email():
     return "hkfdla"
 
-@app.route('/mailbox/email/<email_id:int>/label/<label:str>', methods=['DELETE'])
+@app.route('/mailbox/email/<int:email_id>/label/<string:label>', methods=['DELETE'])
 def delete_label():
     return "fjdkl"
 
@@ -56,4 +57,4 @@ def delete_label():
 if __name__ == '__main__':
     # run() method of Flask class runs the application
     # on the local development server.
-    app.run(debug=True,port=8888)
+    app.run(debug=True,port=5000)
