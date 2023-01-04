@@ -4,13 +4,13 @@ import os
 import random
 
 from flask import Flask, jsonify, request
-import time
 import datetime
 import structlog
 
 app = Flask(__name__)
 
 VALID_LABELS=['read', 'spam', 'important']
+VALID_FOLDERS = ['inbox', 'archive', 'trash', 'important']
 
 
 def get_db_connection():
@@ -35,7 +35,8 @@ def hello_world():
 
 @app.route('/email', methods=['POST'])
 def receive_emails():
-    print("test")
+    logger = structlog.get_logger()
+    logger.info(event="email::post")
     cur = conn.cursor()
     print('Printing JSON...')
     #Content-type:application/json expected
@@ -65,6 +66,9 @@ def get_email(email_id):
 @app.route('/mailbox/email/<int:email_id>/folder', methods=['GET'])
 # get the folder containing the email
 def get_folder(email_id):
+    logger = structlog.get_logger()
+    logger.info(event="email::id::folder::get",
+                email_id=email_id)
     cur = conn.cursor()
     #a %s can be used in an execute to insert a string
     cur.execute('SELECT folder FROM emails WHERE email_id=%s', str(email_id))
@@ -87,22 +91,47 @@ def get_labels(email_id):
 
 @app.route('/mailbox/folder/<string:folder>', methods=['GET'])
 # list emails in a given folder
-def emails_in_folder():
-    return "jfda"
+def emails_in_folder(folder):
+    logger = structlog.get_logger()
+    logger.info(event="folder::get", folder=folder)
+    global VALID_FOLDERS
+    if folder not in VALID_FOLDERS:
+        return 'Invalid Folder, must be inbox, archive, trash or sent'
+    cur = conn.cursor()
+    cur.execute('SELECT email_id FROM emails WHERE folder=%s', str(folder))
+    emails = cur.fetchone()[0]
+    cur.close()
+    return emails
 
 @app.route('/mailbox/labels/<string:label>', methods=['GET'])
 # list emails with given label
-def emails_with_label():
-    return "kleraho"
+def emails_with_label(label):
+    logger = structlog.get_logger()
+    logger.info(event="label::get", label=label)
+    global VALID_LABELS
+    if label not in VALID_LABELS:
+        return 'Invalid Label, must be read, important, or spam'
+    cur = conn.cursor()
+    cur.execute('SELECT email_id FROM emails WHERE label=%s', str(label))
+    emails = cur.fetchone()[0]
+    cur.close()
+    return emails
 
-@app.route('/mailbox/email/<int:email_id>/folder/<string:folder>', methods=['POST'])
+@app.route('/mailbox/email/<int:email_id>/folder/<string:folder>', methods=['PUT'])
 # moves email to the given folder
 def move_email(email_id, folder):
     logger = structlog.get_logger()
+    global VALID_FOLDERS
+    if folder not in VALID_FOLDERS:
+        return 'Invalid Folder, must be inbox, archive, trash or sent'
     logger.info(event="email::id::folder::post",
         email_id=email_id,
         folder=folder)
-    return "gkdsl"
+    cur = conn.cursor()
+    cur.execute('UPDATE emails SET folder=%s WHERE email_id=%s', str(folder), str(email_id))
+    cur.commmit()
+    cur.close()
+    return 'Success'
 
 @app.route('/mailbox/email/<int:email_id>/label/<string:label>', methods=['PUT'])
 # mark the given email with the given label
@@ -129,8 +158,25 @@ def mark_email(email_id, label):
     return 'Success'
 
 @app.route('/mailbox/email/<int:email_id>/label/<string:label>', methods=['DELETE'])
-def delete_label():
-    return "fjdkl"
+def delete_label(email_id, label):
+    logger = structlog.get_logger()
+    logger.info(event="email::id::label::delete", email_id=email_id, label=label)
+    global VALID_LABELS
+    if label not in VALID_LABELS:
+        return 'Invalid Label, must be read, important, or spam'
+    cur = conn.cursor()
+    # get current labels
+    cur.execute('SELECT labels FROM emails where email_id=%s', str(email_id))
+    labels = cur.fetchone()[0]
+    print(labels)
+    # remove label
+    if label in labels:
+        labels.remove(label)
+    cur.execute('UPDATE emails SET labels=%s WHERE email_id=%s', (list(set(labels)), str(email_id)))
+    # Commit all changes
+    conn.commit()
+    cur.close()
+    return 'Success'
 
 
 # main driver function
