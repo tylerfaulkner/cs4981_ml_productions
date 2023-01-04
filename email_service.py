@@ -6,6 +6,7 @@ import random
 from flask import Flask, jsonify, request
 import time
 import datetime
+import structlog
 
 app = Flask(__name__)
 
@@ -71,6 +72,9 @@ def get_folder(email_id):
 @app.route('/mailbox/email/<int:email_id>/labels', methods=['GET'])
 # returns json object with the fields "email_id" and "labels"
 def get_labels(email_id):
+    logger = structlog.get_logger()
+    logger.info(event="email::id::labels::get",
+        email_id=email_id)
     cur = conn.cursor()
     #a %s can be used in an execute to insert a string
     cur.execute('SELECT labels FROM emails WHERE email_id=%s', str(email_id))
@@ -90,12 +94,20 @@ def emails_with_label():
 
 @app.route('/mailbox/email/<int:email_id>/folder/<string:folder>', methods=['POST'])
 # moves email to the given folder
-def move_email():
+def move_email(email_id, folder):
+    logger = structlog.get_logger()
+    logger.info(event="email::id::folder::post",
+        email_id=email_id,
+        folder=folder)
     return "gkdsl"
 
 @app.route('/mailbox/email/<int:email_id>/label/<string:label>', methods=['PUT'])
 # mark the given email with the given label
 def mark_email(email_id, label):
+    logger = structlog.get_logger()
+    logger.info(event="email::id::label::put",
+        email_id=email_id,
+        label=label)
     global VALID_LABELS
     if label not in VALID_LABELS:
         return 'Invalid Label, must be read, important, or spam'
@@ -122,4 +134,10 @@ def delete_label():
 if __name__ == '__main__':
     # run() method of Flask class runs the application
     # on the local development server.
-    app.run(debug=True,port=8888)
+
+    with open("log_file.json", "wt", encoding="utf-8") as log_fl:
+        structlog.configure(
+            processors=[structlog.processors.TimeStamper(fmt="iso"),
+                structlog.processors.JSONRenderer()],
+                logger_factory=structlog.WriteLoggerFactory(file=log_fl))
+        app.run(debug=True,port=8888)
