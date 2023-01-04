@@ -52,6 +52,9 @@ def receive_emails():
 @app.route('/mailbox/email/<int:email_id>', methods=['GET'])
 # returns json object with the key "email" and associated value of a String
 def get_email(email_id):
+    logger = structlog.get_logger()
+    logger.info(event="email::id::body::get",
+        email_id=email_id)
     cur = conn.cursor()
     #a %s can be used in an execute to insert a string
     cur.execute('SELECT email_object FROM emails WHERE email_id=%s', str(email_id))
@@ -135,7 +138,7 @@ if __name__ == '__main__':
     # run() method of Flask class runs the application
     # on the local development server.
 
-    with open("log_file.json", "wt", encoding="utf-8") as log_fl:
+    with open("log_file.json", "at", encoding="utf-8") as log_fl:
         structlog.configure(
             processors=[structlog.processors.TimeStamper(fmt="iso"),
                 structlog.processors.JSONRenderer()],
