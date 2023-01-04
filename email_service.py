@@ -10,7 +10,7 @@ import structlog
 app = Flask(__name__)
 
 VALID_LABELS=['read', 'spam', 'important']
-VALID_FOLDERS = ['inbox', 'archive', 'trash', 'important']
+VALID_FOLDERS = ['Inbox', 'Archive', 'Trash', 'Important']
 
 
 def get_db_connection():
@@ -58,7 +58,7 @@ def get_email(email_id):
         email_id=email_id)
     cur = conn.cursor()
     #a %s can be used in an execute to insert a string
-    cur.execute('SELECT email_object FROM emails WHERE email_id=%s', str(email_id))
+    cur.execute('SELECT email_object FROM emails WHERE email_id=%s', (str(email_id),))
     email = cur.fetchone()[0]
     cur.close()
     return jsonify({'email':email})
@@ -71,7 +71,7 @@ def get_folder(email_id):
                 email_id=email_id)
     cur = conn.cursor()
     #a %s can be used in an execute to insert a string
-    cur.execute('SELECT folder FROM emails WHERE email_id=%s', str(email_id))
+    cur.execute('SELECT folder FROM emails WHERE email_id=%s', (str(email_id),))
     folder = cur.fetchone()[0] #items from select are returned in a list
     cur.close()
     return folder
@@ -84,10 +84,13 @@ def get_labels(email_id):
         email_id=email_id)
     cur = conn.cursor()
     #a %s can be used in an execute to insert a string
-    cur.execute('SELECT labels FROM emails WHERE email_id=%s', str(email_id))
+    cur.execute('SELECT labels FROM emails WHERE email_id=%s', (str(email_id),))
     labels = cur.fetchone()[0] #items from select are returned in a list
     cur.close()
     return labels
+
+def get_first_element(element):
+    return element[0]
 
 @app.route('/mailbox/folder/<string:folder>', methods=['GET'])
 # list emails in a given folder
@@ -98,12 +101,16 @@ def emails_in_folder(folder):
     if folder not in VALID_FOLDERS:
         return 'Invalid Folder, must be inbox, archive, trash or sent'
     cur = conn.cursor()
-    cur.execute('SELECT email_id FROM emails WHERE folder=%s', str(folder))
-    emails = cur.fetchone()[0]
+    print(folder)
+    cur.execute('SELECT email_id FROM emails WHERE folder=\''+ str(folder)+'\';')
+    raw_data = cur.fetchall()
     cur.close()
+    print(raw_data[0][0])
+    emails = list(map(get_first_element, raw_data))
+    print(emails)
     return emails
 
-@app.route('/mailbox/labels/<string:label>', methods=['GET'])
+@app.route('/mailbox/label/<string:label>', methods=['GET'])
 # list emails with given label
 def emails_with_label(label):
     logger = structlog.get_logger()
@@ -112,9 +119,10 @@ def emails_with_label(label):
     if label not in VALID_LABELS:
         return 'Invalid Label, must be read, important, or spam'
     cur = conn.cursor()
-    cur.execute('SELECT email_id FROM emails WHERE label=%s', str(label))
-    emails = cur.fetchone()[0]
+    cur.execute('SELECT email_id FROM emails WHERE \''+ str(label) +'\' = ANY(labels);')
+    raw_data = cur.fetchall()
     cur.close()
+    emails = list(map(get_first_element, raw_data))
     return emails
 
 @app.route('/mailbox/email/<int:email_id>/folder/<string:folder>', methods=['PUT'])
@@ -128,8 +136,7 @@ def move_email(email_id, folder):
         email_id=email_id,
         folder=folder)
     cur = conn.cursor()
-    cur.execute('UPDATE emails SET folder=%s WHERE email_id=%s', str(folder), str(email_id))
-    cur.commmit()
+    cur.execute('UPDATE emails SET folder=%s WHERE email_id=%s', (str(folder), str(email_id)))
     cur.close()
     return 'Success'
 
@@ -145,7 +152,7 @@ def mark_email(email_id, label):
         return 'Invalid Label, must be read, important, or spam'
     cur = conn.cursor()
     #get current labels
-    cur.execute('SELECT labels FROM emails where email_id=%s', str(email_id))
+    cur.execute('SELECT labels FROM emails where email_id=%s', (str(email_id),))
     labels = cur.fetchone()[0]
     print(labels)
     #add new label
@@ -166,7 +173,7 @@ def delete_label(email_id, label):
         return 'Invalid Label, must be read, important, or spam'
     cur = conn.cursor()
     # get current labels
-    cur.execute('SELECT labels FROM emails where email_id=%s', str(email_id))
+    cur.execute('SELECT labels FROM emails where email_id=%s', (str(email_id),))
     labels = cur.fetchone()[0]
     print(labels)
     # remove label
