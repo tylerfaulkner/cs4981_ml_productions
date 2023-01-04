@@ -5,11 +5,12 @@ import random
 
 from flask import Flask, jsonify, request
 import time
-from dotenv import load_dotenv
+import datetime
 
 app = Flask(__name__)
 
-load_dotenv()
+VALID_LABELS=['read', 'spam', 'important']
+
 
 def get_db_connection():
     # figure out how to not have the environment variables showing
@@ -35,43 +36,47 @@ def hello_world():
 def receive_emails():
     print("test")
     cur = conn.cursor()
-    email_data = request.data.decode('utf-8')
+    print('Printing JSON...')
+    #Content-type:application/json expected
+    email_data = request.json
     print(email_data)
-    email_data = json.loads(email_data)
-    email_object = {
-        "to": email_data['to'],
-        "from": email_data['from'],
-        "subject": email_data['subject'],
-        "body": email_data['body']
-    }
     cur.execute('INSERT INTO emails (received_timestamp, email_object)'
-                'VALUES (%s, %s)',
-                (time.time(), json.dumps(email_object)))
+                'VALUES (%s, %s) RETURNING email_id',
+                (datetime.datetime.now(), json.dumps(email_data)))
+    id = cur.fetchone()[0]
     conn.commit()
     cur.close()
-    return jsonify({"email_id": random.randint(1, 1000)})
+    return jsonify({"email_id": id})
 
 @app.route('/mailbox/email/<int:email_id>', methods=['GET'])
 # returns json object with the key "email" and associated value of a String
 def get_email(email_id):
-    #not sure if this is right at all:/
-    print(email_id)
     cur = conn.cursor()
-    cur.execute('SELECT email_id, email_object FROM emails WHERE email_id=email_id')  # I have no idea how to put a variable into this statement
-    emails = cur.fetchall()
-    print(emails)
+    #a %s can be used in an execute to insert a string
+    cur.execute('SELECT email_object FROM emails WHERE email_id=%s', str(email_id))
+    email = cur.fetchone()[0]
     cur.close()
-    return emails
+    return jsonify({'email':email})
 
 @app.route('/mailbox/email/<int:email_id>/folder', methods=['GET'])
 # get the folder containing the email
-def get_folder():
-    return "yo"
+def get_folder(email_id):
+    cur = conn.cursor()
+    #a %s can be used in an execute to insert a string
+    cur.execute('SELECT folder FROM emails WHERE email_id=%s', str(email_id))
+    folder = cur.fetchone()[0] #items from select are returned in a list
+    cur.close()
+    return folder
 
 @app.route('/mailbox/email/<int:email_id>/labels', methods=['GET'])
 # returns json object with the fields "email_id" and "labels"
-def get_labels():
-    return "hehe"
+def get_labels(email_id):
+    cur = conn.cursor()
+    #a %s can be used in an execute to insert a string
+    cur.execute('SELECT labels FROM emails WHERE email_id=%s', str(email_id))
+    labels = cur.fetchone()[0] #items from select are returned in a list
+    cur.close()
+    return labels
 
 @app.route('/mailbox/folder/<string:folder>', methods=['GET'])
 # list emails in a given folder
@@ -90,8 +95,23 @@ def move_email():
 
 @app.route('/mailbox/email/<int:email_id>/label/<string:label>', methods=['PUT'])
 # mark the given email with the given label
-def mark_email():
-    return "hkfdla"
+def mark_email(email_id, label):
+    global VALID_LABELS
+    if label not in VALID_LABELS:
+        return 'Invalid Label, must be read, important, or spam'
+    cur = conn.cursor()
+    #get current labels
+    cur.execute('SELECT labels FROM emails where email_id=%s', str(email_id))
+    labels = cur.fetchone()[0]
+    print(labels)
+    #add new label
+    labels.append(label)
+    #psycopg2 can only convert list types, so convert back
+    cur.execute('UPDATE emails SET labels=%s WHERE email_id=%s', (list(set(labels)), str(email_id)))
+    #Commit all changes
+    conn.commit()
+    cur.close()
+    return 'Success'
 
 @app.route('/mailbox/email/<int:email_id>/label/<string:label>', methods=['DELETE'])
 def delete_label():
