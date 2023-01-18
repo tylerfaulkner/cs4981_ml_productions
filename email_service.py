@@ -1,8 +1,6 @@
 import json
 import psycopg2
 import os
-import random
-
 from flask import Flask, jsonify, request
 import datetime
 import structlog
