@@ -1,3 +1,4 @@
 log_file.json
 .env
 log_file.json.offset
+.venv
