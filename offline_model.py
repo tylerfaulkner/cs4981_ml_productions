@@ -1,6 +1,7 @@
 #Offline Model Development
 import json
 import pickle
+import io
 import datetime
 import numpy as np
 import pandas as pd
@@ -61,11 +62,19 @@ def train_new_model():
 
     rows = load_logs_from_minio()
     df = pd.DataFrame(rows)
+    df = df.set_index('email_id')
+    print(df.head())
 
     #Split the data into training and testing
-    X = df[params['body']]
-    y = df[params['label']]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X = df['body'].to_numpy()
+    y = df['label'].to_numpy()
+
+    #Convert the labels to 0 and 1
+    y[y == 'spam'] = 1
+    y[y == 'ham'] = 0
+    y = y.astype(int)
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
     #Balance the classes in the training data
     #This is done by undersampling the majority class
@@ -111,14 +120,17 @@ def train_new_model():
         'class_balance': 'undersampled'
     }
     #Get current datetime
-    now = datetime.now()
-    dt_string = now.strftime("%d/%m/%Y_%H:%M:%S")
+    now = datetime.datetime.now()
+    dt_string = now.strftime("(%d_%m_%Y)_(%H_%M_%S)")
 
     file_name = 'model_' + dt_string + '.pkl'
     #Save the model to Minio
-    with open(file_name, 'rwb') as f:
+    with open(file_name, 'wb') as f:
         pickle.dump(data, f)
-        bucket.upload_file(f, file_name)
+        bucket.upload_file(file_name, file_name)
+
+if __name__ == '__main__':
+    train_new_model()
 
 
 
