@@ -1,0 +1,1 @@
+{"parameters": {"model": "Logistic Regression", "min_df": 10}, "metrics": {"accuracy": 0.9595141700404858, "precision": 0.9536163522012578, "recall": 0.9910130718954249}}
