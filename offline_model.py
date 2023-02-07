@@ -113,10 +113,10 @@ def train_new_model():
 
     #Put necessary data into a dictionary to be saved using pickle
     data = {
-        'model': model,
-        'vectorizer': vectorizer,
+        #'model': model,
+        #'vectorizer': vectorizer,
         'parameters': params['parameters'],
-        'input': X_train,
+        #'input': X_train,
         'class_balance': 'undersampled'
     }
     #Get current datetime
@@ -127,6 +127,9 @@ def train_new_model():
     #Save the model to Minio
     with open(file_name, 'wb') as f:
         pickle.dump(data, f)
+        pickle.dump(model, f)
+        pickle.dump(vectorizer, f)
+        
         bucket.upload_file(file_name, file_name)
 
 if __name__ == '__main__':

@@ -36,16 +36,20 @@ def load_models():
     for obj in bucket.objects.all():
         if obj.key.startswith('model_'):
             model_file = obj.key
+            print("Loading model: " + model_file)
             #Load the model
             obj = obj.get()
             bytes_buffer = io.BytesIO()
-            client.download_fileobj('models', model_file, bytes_buffer)
-            byte_value = bytes_buffer.getvalue()
-            model_config = pickle.loads(byte_value)
+            with open('temp.pkl', 'wb') as f:
+                client.download_fileobj('models', model_file, f)
+            #client.download_fileobj('models', model_file, bytes_buffer)
+            #data = target.Bucket("models").Object(model_file).get()['Body'].read()
             global model
-            model = model_config['model']
             global vectorizer
-            vectorizer = model_config['vectorizer']
+            with open('temp.pkl', 'rb') as f:
+                pickle.load(f)
+                model = pickle.load(f)
+                vectorizer = pickle.load(f)
 
 
 
