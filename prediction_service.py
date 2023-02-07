@@ -4,6 +4,8 @@ from flask import Flask, request
 import pickle
 import boto3
 import io
+import json
+import numpy as np
 
 
 app = Flask(__name__)
@@ -66,11 +68,23 @@ def classify_email():
     #Get the email body
     email_body = request.json['email']['body']
     #Transform the email body
-    email_body = vectorizer.transform(email_body)
+    print('Vecotrizing email body')
+    email_vec = vectorizer.transform([email_body])
+
+    print(email_vec.shape)
+
     #Predict the class
-    predicted_class = model.predict(email_body)
+    print('Predicting class')
+    pred_prob = model.predict(email_vec)[0]
+
+    predicted_class = 'ham'
+    if pred_prob > 0.9:
+        predicted_class = 'spam'
+
+    print(predicted_class)
 
     #Log the event
+    print('Logging event')
     logger = structlog.get_logger()
     logger.info(event="classify::email::post", predicted_class=predicted_class)
 
