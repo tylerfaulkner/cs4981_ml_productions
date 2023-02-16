@@ -34,24 +34,33 @@ def load_models():
         verify=False
     )
     bucket = target.Bucket('models')
+    most_recent_model_name = None
+    most_recent_model_date = None
     #Get the most recent model
     for obj in bucket.objects.all():
         if obj.key.startswith('model_'):
             model_file = obj.key
-            print("Loading model: " + model_file)
-            #Load the model
-            obj = obj.get()
-            bytes_buffer = io.BytesIO()
-            with open('temp.pkl', 'wb') as f:
-                client.download_fileobj('models', model_file, f)
-            #client.download_fileobj('models', model_file, bytes_buffer)
-            #data = target.Bucket("models").Object(model_file).get()['Body'].read()
-            global model
-            global vectorizer
-            with open('temp.pkl', 'rb') as f:
-                pickle.load(f)
-                model = pickle.load(f)
-                vectorizer = pickle.load(f)
+            if most_recent_model_date == None:
+                most_recent_model_date = obj.last_modified
+                most_recent_model_name = model_file
+            else:
+                if obj.last_modified > most_recent_model_date:
+                    most_recent_model_date = obj.last_modified
+                    most_recent_model_name = model_file
+    if most_recent_model_name is not None:
+        print("Loading model: " + most_recent_model_name)
+        #Load the model
+        obj = obj.get()
+        with open('temp.pkl', 'wb') as f:
+            client.download_fileobj('models', most_recent_model_name, f)
+        #client.download_fileobj('models', model_file, bytes_buffer)
+        #data = target.Bucket("models").Object(model_file).get()['Body'].read()
+        global model
+        global vectorizer
+        with open('temp.pkl', 'rb') as f:
+            pickle.load(f)
+            model = pickle.load(f)
+            vectorizer = pickle.load(f)
 
 
 
@@ -68,13 +77,13 @@ def classify_email():
     #Get the email body
     email_body = request.json['email']['body']
     #Transform the email body
-    print('Vecotrizing email body')
+    #print('Vecotrizing email body')
     email_vec = vectorizer.transform([email_body])
 
-    print(email_vec.shape)
+    #print(email_vec.shape)
 
     #Predict the class
-    print('Predicting class')
+    #print('Predicting class')
     pred_prob = model.predict(email_vec)[0]
 
     predicted_class = 'ham'
@@ -84,7 +93,7 @@ def classify_email():
     print(predicted_class)
 
     #Log the event
-    print('Logging event')
+    #print('Logging event')
     logger = structlog.get_logger()
     logger.info(event="classify::email::post", predicted_class=predicted_class)
 
@@ -104,4 +113,4 @@ if __name__ == '__main__':
                         structlog.processors.JSONRenderer()],
             logger_factory=structlog.WriteLoggerFactory(file=log_fl))
         load_models()
-        app.run(debug=True, port=8888)
+        app.run(debug=True, port=8888, threaded=True)
