@@ -3,3 +3,4 @@ log_file.json
 log_file.json.offset
 .venv
 *.pkl
+*.parquet
